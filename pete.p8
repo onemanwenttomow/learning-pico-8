@@ -2,20 +2,35 @@ pico-8 cartridge // http://www.pico-8.com
 version 27
 __lua__
 function _init()
+	local i
 	player = {x=50, y=50}
 	playerxd = 1
 	playeryd = 1
+	brick_x={}
+	brick_y={}
+	brick_w=10
+	brick_h=5
+	brick_c=1
+	for i=1,8 do
+		add(brick_x, i*(10+ 2))
+		add(brick_y, 30)
+	end
+
 	cls()
 	rectfill(0,0,127,127,1)
 	print("♥", player.x, player.y, 5)
 end
 
 function _update()
+	local i
 	move_hero()
 	rectfill(0,0,127,127,1)
 	sfx(0)
 	print("♥", player.x, player.y, 5)
-	
+	for i=1,#brick_x do
+		print(brick_x[i])
+	 rectfill(brick_x[i],brick_y[i],brick_x[i] + brick_w,brick_y[i] + brick_h,3)
+	end
 end
 
 function move_hero()

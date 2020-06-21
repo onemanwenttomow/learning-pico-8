@@ -29,13 +29,16 @@ end
 function update_game()
 
  local	buttpress=false
- local nextx, nexty
+ local nextx, nexty, brickhit
 	
 	if btn(0) then
 		--left
 		pad_dx=-2.5	
 		buttpress=true
 		--pad_x-=5
+		if sticky then
+			ball_dx=-1
+		end
 	end
 	
 	if btn(1) then
@@ -43,6 +46,13 @@ function update_game()
 		pad_dx=2.5
 		buttpress=true
  	--pad_x+=5
+ 	if sticky then
+ 		ball_dx=1
+ 	end
+	end
+	
+	if sticky and btnp(5) then
+		sticky=false
 	end
 	
 	if not(buttpress) then
@@ -52,75 +62,90 @@ function update_game()
 	pad_x+=pad_dx
 	pad_x=mid(0,pad_x, 127-pad_w)
 	
-	nextx = ball_x + ball_dx
-	nexty = ball_y + ball_dy
+	if sticky then
+		ball_x=pad_x+flr(pad_w/2)
+		ball_y=pad_y-ball_r-1
+	else
+		-- regular ball physics
+		nextx = ball_x + ball_dx
+		nexty = ball_y + ball_dy
+	
+		if nextx > 125 or nextx < 2 then
+			--3 params
+			-- somewhere between 0 and 127
+			nextx=mid(0,nextx,127)
+			ball_dx = -ball_dx
+			sfx(0)
+		end
 		
-	if nextx > 125 or nextx < 2 then
-		--3 params
-		-- somewhere between 0 and 127
-		nextx=mid(0,nextx,127)
-		ball_dx = -ball_dx
-		sfx(0)
-	end
+		if nexty < (6 + ball_r*2) then
+			nexty=mid(0,nexty,127)
+			ball_dy = -ball_dy
+			sfx(0)
+		end
+		
 	
-	if nexty < (6 + ball_r*2) then
-		nexty=mid(0,nexty,127)
-		ball_dy = -ball_dy
-		sfx(0)
-	end
-	
-
-	-- check if ball hit pad
-	if ball_box(nextx, nexty,pad_x, pad_y, pad_w, pad_h) then
-		-- deal with collision
-		-- find out in which direction to deflect
-	 if	deflx_ballbox(ball_x,ball_y,ball_dx,ball_dy,pad_x,pad_y,pad_w,pad_h) then
-	 	ball_dx = -ball_dx
-	 else 
-	 	ball_dy = -ball_dy
-	 end
-	 sfx(1)
-	 points+=1
-	end
-	
-	-- check if ball hit brick
-	for i=1,#brick_x do
-		if brick_v[i] and ball_box(nextx, nexty,brick_x[i], brick_y[i], brick_w, brick_h) then
+		-- check if ball hit pad
+		if ball_box(nextx, nexty,pad_x, pad_y, pad_w, pad_h) then
 			-- deal with collision
 			-- find out in which direction to deflect
-	 	if	deflx_ballbox(ball_x,ball_y,ball_dx,ball_dy,brick_x[i],brick_y[i],brick_w,brick_h) then
-	 		ball_dx = -ball_dx
+		 if	deflx_ball_box(ball_x,ball_y,ball_dx,ball_dy,pad_x,pad_y,pad_w,pad_h) then
+		 	ball_dx = -ball_dx
+		 	if ball_x < pad_x+pad_w/2 then
+		 		nextx=pad_x-ball_r
+		 	else 
+		 		nextx=pad_x+pad_w+ball_r
+		 	end
 		 else 
-	 		ball_dy = -ball_dy
+		 	ball_dy = -ball_dy
+		 	nexty=pad_y-ball_r
 		 end
-		 sfx(3)
-		 brick_v[i]=false
-		 points+=10
+		 sfx(1)
+		 points+=1
+		end
+		
+		-- check if ball hit brick
+		brickhit=false
+		for i=1,#brick_x do
+			if brick_v[i] and ball_box(nextx, nexty,brick_x[i], brick_y[i], brick_w, brick_h) then
+				-- deal with collision
+				-- find out in which direction to deflect
+		 	if not(brickhit) then
+			 	if	deflx_ball_box(ball_x,ball_y,ball_dx,ball_dy,brick_x[i],brick_y[i],brick_w,brick_h) then
+			 		ball_dx = -ball_dx
+				 else 
+			 		ball_dy = -ball_dy
+				 end
+		 	end
+			 brickhit=true
+			 sfx(3)
+			 brick_v[i]=false
+			 points+=10
+			end
+		end
+		
+		
+		ball_x=nextx
+		ball_y=nexty
+		
+		if nexty > 127 then
+			sfx(2)
+			lives-=1
+			if lives<0 then
+				gameover()
+			else
+				serveball()
+			end
 		end
 	end
-	
-	
-	ball_x=nextx
-	ball_y=nexty
-	
-	if nexty > 127 then
-		sfx(2)
-		lives-=1
-		if lives<0 then
-			gameover()
-		else
-			serveball()
-		end
-	end
-	
 end
 
 function serveball()
-	ball_x=30
-	ball_y=33
-	ball_dx=2
-	ball_dy=2
-
+	ball_x=pad_x+flr(pad_w/2)
+	ball_y=pad_y-ball_r
+	ball_dx=1
+	ball_dy=-1
+	sticky=true
 end
 
 function update_start()
@@ -153,6 +178,11 @@ function draw_game()
 	
 	cls(1)
 	circfill(ball_x, ball_y, ball_r,10)
+	if sticky then
+		-- serve preview
+		line(ball_x+ball_dx*4,ball_y+ball_dy*4,ball_x+ball_dx*7,ball_y+ball_dy*7,11)
+	end
+	
 	rectfill(pad_x, pad_y, pad_x + pad_w, pad_y + pad_h, pad_c)	
 
 	--draw bricks
@@ -161,8 +191,7 @@ function draw_game()
  		rectfill(brick_x[i], brick_y[i], brick_x[i] + brick_w, brick_y[i] + brick_h,14)	
 		end
 	end
-	
-	
+		
 	rectfill(0,0,127,6,4)
 	print("lives:"..lives,1,1,0)
 	print("score:"..points,35,1,0)
@@ -184,10 +213,10 @@ function startgame()
 	brick_h=4
 	buildbricks()
 
-	
-
 	lives=3
 	points=0
+	
+	sticky=true
 	
 	serveball()
 end
@@ -197,9 +226,9 @@ function buildbricks()
 	brick_x={}
 	brick_y={}
 	brick_v={}
-	for i=1,8 do
-		add(brick_x,5+(i-1)*(brick_w+5))
-		add(brick_y,20)
+	for i=1,32 do
+		add(brick_x,5+((i-1)%8)*(brick_w+5))
+		add(brick_y,20+flr((i-1)/8)*(brick_h+3))
 		add(brick_v,true)
 	end
 end
@@ -217,73 +246,30 @@ function ball_box(bx,by,box_x, box_y, box_w, box_h)
 	return true
 end
 
-
-function deflx_ballbox(bx,by,bdx,bdy,tx,ty,tw,th)
- -- calculate wether to deflect the ball
- -- horizontally or vertically when it hits a box
+function deflx_ball_box(bx,by,bdx,bdy,tx,ty,tw,th)
+ local slp = bdy / bdx
+ local cx, cy
  if bdx == 0 then
-  -- moving vertically
   return false
  elseif bdy == 0 then
-  -- moving horizontally
   return true
+ elseif slp > 0 and bdx > 0 then
+  cx = tx - bx
+  cy = ty - by
+  return cx > 0 and cy/cx < slp
+ elseif slp < 0 and bdx > 0 then
+  cx = tx - bx
+  cy = ty + th - by
+  return cx > 0 and cy/cx >= slp
+ elseif slp > 0 and bdx < 0 then
+  cx = tx + tw - bx
+  cy = ty + th - by
+  return cx < 0 and cy/cx <= slp
  else
-  -- moving diagonally
-  -- calculate slope
-  local slp = bdy / bdx
-  local cx, cy
-  -- check variants
-  if slp > 0 and bdx > 0 then
-   -- moving down right
-   debug1="q1"
-   cx = tx-bx
-   cy = ty-by
-   if cx<=0 then
-    return false
-   elseif cy/cx < slp then
-    return true
-   else
-    return false
-   end
-  elseif slp < 0 and bdx > 0 then
-   debug1="q2"
-   -- moving up right
-   cx = tx-bx
-   cy = ty+th-by
-   if cx<=0 then
-    return false
-   elseif cy/cx < slp then
-    return false
-   else
-    return true
-   end
-  elseif slp > 0 and bdx < 0 then
-   debug1="q3"
-   -- moving left up
-   cx = tx+tw-bx
-   cy = ty+th-by
-   if cx>=0 then
-    return false
-   elseif cy/cx > slp then
-    return false
-   else
-    return true
-   end
-  else
-   -- moving left down
-   debug1="q4"
-   cx = tx+tw-bx
-   cy = ty-by
-   if cx>=0 then
-    return false
-   elseif cy/cx < slp then
-    return false
-   else
-    return true
-   end
-  end
+  cx = tx + tw - bx
+  cy = ty - by
+  return cx < 0 and cy/cx >= slp
  end
- return false
 end
 
 
