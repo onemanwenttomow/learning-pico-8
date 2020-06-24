@@ -4,6 +4,8 @@ __lua__
 function _init()
  cls() 
  mode="start"
+ level="bxbxbxbxbx/xbxbxbxbxb/bxbxbxbxbx/xbxbxbxbxb/bxbxbxbxbx"
+ debug=""
 end
 
 function _update60()
@@ -90,6 +92,7 @@ function update_game()
 			-- deal with collision
 			-- find out in which direction to deflect
 		 if	deflx_ball_box(ball_x,ball_y,ball_dx,ball_dy,pad_x,pad_y,pad_w,pad_h) then
+		 	-- ball hit paddle on side
 		 	ball_dx = -ball_dx
 		 	if ball_x < pad_x+pad_w/2 then
 		 		nextx=pad_x-ball_r
@@ -97,11 +100,22 @@ function update_game()
 		 		nextx=pad_x+pad_w+ball_r
 		 	end
 		 else 
+		 	-- ball hit paddle on top
 		 	ball_dy = -ball_dy
 		 	nexty=pad_y-ball_r
+		 	if abs(pad_dx) > 2 then
+		 		-- change angle
+		 		if sign(pad_dx)==sign(ball_dx) then
+		 				-- flatten angle
+		 				setang(mid(0,ball_ang-1,2))
+		 			else 
+		 				--raise angle
+		 				setang(mid(0,ball_ang+1,2))
+		 			end
+		 	end
 		 end
 		 sfx(1)
-		 points+=1
+		 chain=1
 		end
 		
 		-- check if ball hit brick
@@ -118,9 +132,11 @@ function update_game()
 				 end
 		 	end
 			 brickhit=true
-			 sfx(3)
+			 sfx(2+chain)
 			 brick_v[i]=false
-			 points+=10
+			 points+=10*chain
+			 chain+=1
+			 chain = mid(1, chain, 7)
 			end
 		end
 		
@@ -145,7 +161,35 @@ function serveball()
 	ball_y=pad_y-ball_r
 	ball_dx=1
 	ball_dy=-1
+	ball_ang=1
+	
 	sticky=true
+	chain=1
+	
+end
+
+function setang(ang)
+	ball_ang=ang
+	if ang==2 then
+		ball_dx=0.50*sign(ball_dx)
+		ball_dy=1.30*sign(ball_dy)
+	elseif ang==0 then
+		ball_dx=1.30*sign(ball_dx)
+		ball_dy=0.50*sign(ball_dy)
+	else
+		ball_dx=1*sign(ball_dx)
+		ball_dy=1*sign(ball_dy)
+	end
+end
+
+function sign(n) 
+	if n<0 then
+		return -1
+	elseif n>0 then
+		return 1
+	else
+		return 0
+	end
 end
 
 function update_start()
@@ -191,10 +235,15 @@ function draw_game()
  		rectfill(brick_x[i], brick_y[i], brick_x[i] + brick_w, brick_y[i] + brick_h,14)	
 		end
 	end
+	
+	if debug!="" then
+		print("debug:"..debug,1,1,0)
+	else
 		
-	rectfill(0,0,127,6,4)
-	print("lives:"..lives,1,1,0)
-	print("score:"..points,35,1,0)
+		rectfill(0,0,127,6,4)
+		print("lives:"..lives,1,1,0)
+		print("score:"..points,35,1,0)
+	end
 end
 
 function startgame()
@@ -211,25 +260,51 @@ function startgame()
 		
 	brick_w=10
 	brick_h=4
-	buildbricks()
+	buildbricks(level)
 
 	lives=3
 	points=0
 	
 	sticky=true
+	chain=1 --combo chain
 	
 	serveball()
 end
 
-function buildbricks() 
-	local i
+function buildbricks(lvl) 
+	local i,j,o, char,last
 	brick_x={}
 	brick_y={}
 	brick_v={}
-	for i=1,32 do
-		add(brick_x,5+((i-1)%8)*(brick_w+5))
-		add(brick_y,20+flr((i-1)/8)*(brick_h+3))
-		add(brick_v,true)
+	
+	j=0
+	for i=1,#lvl do
+		j+=1
+		char=sub(lvl,i,i)
+		
+		if char=="b" then
+			last="b"
+			add(brick_x,4+((j-1)%11)*(brick_w+2))
+			add(brick_y,20+flr((j-1)/11)*(brick_h+2))
+			add(brick_v,true)
+		elseif char=="x" then
+			last="x"
+		elseif char=="/" then		
+			j=(flr((j-1)/11)+1)*11
+		elseif char>="1" and char <="9" then
+			debug=char
+			for o=1,char+0 do
+				if last=="b" then 
+					add(brick_x,5+((j-1)%8)*(brick_w+5))
+					add(brick_y,20+flr((j-1)/8)*(brick_h+3))
+					add(brick_v,true)
+				elseif last=="x" then
+					--nothing
+				end
+				j+=1
+			end
+			j-=1
+		end	 
 	end
 end
 
@@ -288,4 +363,9 @@ __sfx__
 00010000203501f3401d3301b3101a3002330022300213001d3001d3002330023700227003c7001b100003000030000300003001a3001a3000030001300023000430005300053000530005300053000330001300
 00010000160601504013030130202c3002c3001c50023500295002a5002050023500255002750023500235002550026500275002a500275002150024500275002c50027500275002a5002a500255002450025500
 00040000214501f4501d4501b4501745015450104500d4500a4500745005450024500045006050030500000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000300003d3303c330333202d3502c350000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300002b0302c0302e0202e0502e000300000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300002c0302d0302f020300502e000300000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300002e0302f03031020320502e000300000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300002e0303003032020340502e000300000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00030000300303203034020370502e000300000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00030000330303403035020370502e000300000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
